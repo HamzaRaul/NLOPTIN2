@@ -1,0 +1,522 @@
+<script runat="server">
+    Platform.Load("core", "1.1");
+    try {
+</script>
+<!--
+
+    %%[
+    /*Collect data from the From*/
+    SET @email = RequestParameter("email")
+    SET @language = RequestParameter("language")
+    SET @women = iif(RequestParameter("women") == true, 'true', 'false')
+    SET @men = iif(RequestParameter("men") == true, 'true', 'false')
+    SET @girls = iif(RequestParameter("girls") == true, 'true', 'false')
+    SET @boys = iif(RequestParameter("boys") == true, 'true', 'false')
+    SET @timestamp = Format(DateAdd(Now(), 6, "H"), "s")
+    SET @success = false
+    /*On submit the Form*/
+    IF RequestParameter("submitted") == true THEN
+        /*Check if the email exist in SF*/
+        SET @leadRows = RetrieveSalesforceObjects(
+            "Lead",
+            "Id",
+            "Email",
+            "=",
+            @email
+        )
+        SET @accountRows = RetrieveSalesforceObjects(
+            "Account",
+            "Id",
+            "PersonEmail",
+            "=",
+            @email
+        )
+        IF RowCount(@leadRows) == 0 AND RowCount(@accountRows) == 0 THEN
+            /*Case 1: Creat a new lead if email address doesn't exit in SF*/
+            SET @createLead = CreateSalesforceObject(
+                "Lead",
+                10,
+                "FirstName",
+                "Bellerose",
+                "LastName",
+                "Member",
+                "Email",
+                @email,
+                "OptIn__c",
+                "true",
+                "OptInTimestamp__c",
+                @timestamp,
+                "NewsletterMen__c",
+                @men,
+                "NewsletterWomen__c",
+                @women,
+                "NewsletterBoys__c",
+                @boys,
+                "NewsletterGirls__c",
+                @girls,
+                "Language__c",
+                @language
+            )
+            IF Length(@createLead) == 18 THEN
+                SET @success = true
+            ENDIF
+        ELSE
+            IF RowCount(@leadRows) == 1 THEN
+                /*Case 2: Update Lead if email address exist as a lead*/
+                SET @leadRow = Row(@leadRows, 1)
+                SET @id = Field(@leadRow, "id")
+                SET @updateLead = UpdateSingleSalesforceObject(
+                    "Lead",
+                    @id,
+                    "OptIn__c",
+                    "true",
+                    "NewsletterMen__c",
+                    @men,
+                    "NewsletterWomen__c",
+                    @women,
+                    "NewsletterBoys__c",
+                    @boys,
+                    "NewsletterGirls__c",
+                    @girls,
+                    "Language__c",
+                    @language,
+                    "OptInTimestamp__c",
+                    @timestamp
+                )
+            ELSEIF RowCount(@accountRows) == 1 THEN
+                /*Case 2: Update Account if email address exist as a lead*/
+                SET @accountRow = Row(@accountRows, 1)
+                SET @id = Field(@accountRow, "id")
+                SET @updatePersonAccount = UpdateSingleSalesforceObject(
+                    "Account",
+                    @id,
+                    "OptIn__pc",
+                    "true",
+                    "NewsletterMen__pc",
+                    @men,
+                    "Newsletter_Women__pc",
+                    @women,
+                    "Newsletter_Boys__pc",
+                    @boys,
+                    "Newsletter_Girls__pc",
+                    @girls,
+                    "RetailCustomerLanguage__pc",
+                    @language,
+                    "OptInTimestamp__pc",
+                    @timestamp,
+                    
+                )
+            ENDIF
+            IF @updateLead == 1 OR @updatePersonAccount == 1 THEN
+                /*Show success message*/
+                SET @success = true
+            ENDIF
+        ENDIF
+    ENDIF
+]%%
+
+  -->
+<script runat="server">
+    } catch (e) {
+        Write(Stringify(e));
+    }
+</script>
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bellerose newsletter opt-in</title>
+</head>
+
+<style>
+    @font-face {
+        font-family: 'NN Grotesk';
+        src: url('https://cdn.shopify.com/s/files/1/0751/2837/files/NNNouvelleGroteskSTD-Thin.woff2?v=1679586328') format('woff2');
+        font-weight: 300;
+        font-style: normal;
+        font-display: swap;
+    }
+
+    @font-face {
+        font-family: 'NN Grotesk';
+        src: url('https://cdn.shopify.com/s/files/1/0751/2837/files/NNNouvelleGroteskSTD-Normal.woff2?v=1679586328') format('woff2');
+        font-weight: 400;
+        font-style: normal;
+        font-display: swap;
+    }
+
+    html,body{
+        overflow: hidden;
+        margin: 0;
+    }
+
+    .nl-optin {
+        text-align: center;
+        color: #000;
+        position: relative;
+        font-family: "NN Grotesk";
+        width: 100%;
+    }
+
+    .nl-optin__form {
+        position: relative;
+    }
+
+    .nl-optin__radio-input,
+    .nl-optin__checkbox-input {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .nl-optin__title {
+        font-weight: normal;
+        font-size: 24px;
+        line-height: 1;
+        margin-bottom: 20px;
+        margin-top: 0;
+    }
+
+    .nl-optin__input {
+        display: block;
+        width: 100%;
+        font-size: 20px;
+        border: 0;
+        outline: none;
+        border-bottom: 1px solid #000;
+        padding: 4px 0;
+        background: transparent;
+        border-radius: 0;
+    }
+
+    .nl-optin__input--field::placeholder,
+    .nl-optin__input--select:invalid {
+        color: rgba(0,0,0,0.2);
+    }
+
+    .nl-optin__input--select {
+        cursor: pointer;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+    }
+
+    .nl-optin__select-container {
+        position: relative;
+    }
+
+    .nl-optin__select-icon {
+        overflow: visible;
+        position: absolute;
+        right: 0;
+        bottom: 12px;
+        pointer-events: none;
+    }
+
+
+    /* Collection choice */
+
+    .nl-optin__subtitle {
+        text-align: left;
+        font-size: 20px;
+        font-weight: normal;
+        margin-top: 25px;
+        margin-bottom: 10px;
+    }
+
+    .nl-optin__radio-container {
+        display: flex;
+        justify-content: space-between;
+        flex-wrap: wrap;
+    }
+
+    .nl-optin__radio-item {
+        display: flex;
+        align-items: center;
+        cursor: pointer;
+        margin-bottom: 5px;
+    }
+
+    .nl-optin__radio-input:checked+.nl-optin__radio-item .nl-optin__radio-box {
+        background: #000;
+    }
+
+    .nl-optin__radio-box {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        border: 1px solid #000;
+        margin-right: 10px;
+    }
+
+    .nl-optin__radio-label {
+        font-size: 20px;
+        user-select: none;
+    }
+
+
+    /* Accept conditions checkbox */
+
+    .nl-optin__checkbox-item {
+        text-align: left;
+        display: flex;
+        align-items: center;
+        margin-top: 20px;
+        cursor: pointer;
+    }
+
+    .nl-optin__checkbox-box {
+        width: 10px;
+        height: 10px;
+        border: 1px solid #000;
+        margin-right: 8px;
+        box-sizing: content-box;
+    }
+
+    .nl-optin__checkbox-box svg {
+        display: none;
+    }
+
+    .nl-optin__checkbox-input:checked+.nl-optin__checkbox-item svg {
+        display: block;
+    }
+
+    .nl-optin__checkbox-label {
+        font-size: 14px;
+        font-weight: 300;
+        user-select: none;
+    }
+
+    .nl-optin__checkbox-label a {
+        color: currentColor;
+        text-decoration: underline;
+    }
+
+
+    /* Error message */
+
+    .nl-optin__error-message {
+        display: block;
+        font-size: 16px;
+        font-weight: normal;
+        color: #EF5C0E;
+        margin-top: 20px;
+        position: absolute;
+        width: 100%;
+        visibility: hidden;
+    }
+
+    .nl-optin__error-message.is-active {
+        visibility: visible;
+    }
+
+
+    /* Buttons */
+    .nl-optin__button {
+        width: 100%;
+        border: 0;
+        background: #000;
+        text-transform: uppercase;
+        margin-top: 15px;
+        font-size: 16px;
+        font-weight: normal;
+        color: #fff;
+        padding: 10px;
+        border-radius: 0;
+        cursor: pointer;
+    }
+
+    .nl-optin__button:hover {
+        color: #fff;
+        text-decoration: none;
+    }
+
+    .nl-optin__submit {
+        margin-top: 60px;
+    }
+
+
+    /* Invalid states */
+    .nl-optin__input--field.is-invalid,
+    .nl-optin__input--field.is-invalid::placeholder,
+    .nl-optin__input--select.is-invalid,
+    .nl-optin__radio-input.is-invalid+.nl-optin__radio-item .nl-optin__radio-label,
+    .nl-optin__checkbox-input.is-invalid+.nl-optin__checkbox-item .nl-optin__checkbox-label {
+        color: #EF5C0E;
+    }
+
+    /* Subscription completed screen */
+    .nl-optin__completed {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: #fff;
+        flex-direction: column;
+        justify-content: center;
+        display: none;
+    }
+
+    .nl-optin__completed.is-active {
+        display: flex;
+    }
+
+    @media(min-width: 768px) {
+        .nl-optin {
+            width: 100%;
+        }
+    }
+</style>
+
+<body>
+    <div class="nl-optin">
+
+        <!--%%[IF @success == true THEN]%%-->
+        <div class="nl-optin__completed">
+            <p class="nl-optin__title">
+                Thank you!<br />
+                Your subscription is now completed.
+            </p>
+            <a class="nl-optin__button" href="">Manage my account</a>
+        </div>
+        <!--%%[ELSE]%%-->
+        <form class="nl-optin__form" action="%%=RequestParameter('PAGEURL')=%%" method="POST" id="saveForm">
+            <h3 class="nl-optin__title">Subscribe to our newsletter!</h3>
+            <input class="nl-optin__input nl-optin__input--field" type="email" id="email" name="email"
+                placeholder="Email address" value="" required>
+
+            <div class="nl-optin__select-container">
+                <select class="nl-optin__input nl-optin__input--select" id="language" name="language" required>
+                    <option value="" disabled selected>Language preference</option>
+                    <option value="English">English (EN)</option>
+                    <option value="French">Français (FR)</option>
+                    <option value="Dutch">Nederlands (NL)</option>
+                </select>
+                <svg class="nl-optin__select-icon" width="16" height="8">
+                    <path d="M 0 0 L 8 8 L 16 0" stroke="#000" fill="none"></path>
+                </svg>
+            </div>
+
+
+            <h4 class="nl-optin__subtitle">Interests for:</h4>
+            <div class="nl-optin__radio-container">
+                <div>
+                    <input class="nl-optin__radio-input" type="checkbox" id="radio-women" name="women" value="true">
+                    <label class="nl-optin__radio-item" for="radio-women">
+                        <div class="nl-optin__radio-box"></div>
+                        <span class="nl-optin__radio-label">Women collection</span>
+                    </label>
+                    <input class="nl-optin__radio-input" type="checkbox" id="radio-men" name="men" value="true">
+                    <label class="nl-optin__radio-item" for="radio-men">
+                        <div class="nl-optin__radio-box"></div>
+                        <span class="nl-optin__radio-label">Men collection</span>
+                    </label>
+                </div>
+
+                <div>
+                    <input class="nl-optin__radio-input" type="checkbox" id="radio-girls" name="girls" value="true">
+                    <label class="nl-optin__radio-item" for="radio-girls">
+                        <div class="nl-optin__radio-box"></div>
+                        <span class="nl-optin__radio-label">Girls collection</span>
+                    </label>
+
+                    <input class="nl-optin__radio-input" type="checkbox" id="radio-boys" name="boys" value="true">
+                    <label class="nl-optin__radio-item" for="radio-boys">
+                        <div class="nl-optin__radio-box"></div>
+                        <span class="nl-optin__radio-label">Boys collection</span>
+                    </label>
+                </div>
+            </div>
+
+            <input class="nl-optin__checkbox-input" type="checkbox" id="checkbox-conditions" name="general_conditions"
+                required>
+            <label class="nl-optin__checkbox-item" for="checkbox-conditions">
+                <div class="nl-optin__checkbox-box">
+                    <svg width="10" height="10">
+                        <path d="M 0 0 L 10 10" stroke="#000"></path>
+                        <path d="M 10 0 L 0 10" stroke="#000"></path>
+                    </svg>
+                </div>
+                <span class="nl-optin__checkbox-label">I agree to the <a
+                        href="https://www.bellerose.be/pages/legal-notice" target="_blank">general conditions</a> of the
+                    brand</span>
+            </label>
+
+            <span class="nl-optin__error-message error-missing">Oops something is missing</span>
+            <span class="nl-optin__error-message error-invalid-email">Please insert a valid address</span>
+
+            <input class="nl-optin__button nl-optin__submit" type="submit" value="Subscribe">
+            <input id="submitted" type="hidden" name="submitted" value="true" />
+        </form>
+        <!--%%[ENDIF]%%-->
+
+    </div>
+
+    <script>
+        let form = document.querySelector('.nl-optin__form');
+        let formSubmit = document.querySelector('.nl-optin__submit');
+        let formEntries = document.querySelectorAll('.nl-optin input, .nl-optin select');
+        let formRadios = document.querySelectorAll('.nl-optin__radio-input');
+        let errorMissing = document.querySelector('.error-missing');
+        let errorEmail = document.querySelector('.error-invalid-email');
+
+        formSubmit.addEventListener('click', function (e) {
+            if (!form.checkValidity() || document.querySelectorAll('.nl-optin__radio-input:checked').length == 0) {
+                e.preventDefault();
+
+                // Add invalid state on invalid entries
+                formEntries.forEach(function (entry) {
+                    if (!entry.checkValidity() && !entry.classList.contains('nl-optin__radio-input')) {
+                        entry.classList.add('is-invalid');
+                    }
+                })
+
+                if (document.querySelectorAll('.nl-optin__radio-input:checked').length == 0) {
+                    formRadios.forEach(function (radio) {
+                        radio.classList.add('is-invalid');
+                    })
+                }
+
+                // Display email text error if only the email is invalid
+                if (document.querySelector('.nl-optin input[type="email"]').classList.contains('is-invalid') &&
+                    document.querySelectorAll('.is-invalid').length == 1) {
+                    errorMissing.classList.remove('is-active');
+                    errorEmail.classList.add('is-active');
+                } else {
+                    errorEmail.classList.remove('is-active');
+                    errorMissing.classList.add('is-active');
+                }
+
+            }
+        })
+
+        // Remove invalid state on entries change
+        formEntries.forEach(function (entry) {
+            entry.addEventListener('input', function () {
+
+                if (entry.classList.contains('is-invalid')) {
+                    // Remove invalid state on all radio buttons
+                    if (entry.classList.contains('nl-optin__radio-input')) {
+                        formRadios.forEach(function (radio) {
+                            radio.classList.remove('is-invalid')
+                        })
+                    } else {
+                        entry.classList.remove('is-invalid');
+                    }
+
+                    // Hide error message if no error states
+                    if (document.querySelectorAll('.nl-optin .is-invalid').length == 0) {
+                        errorMissing.classList.remove('is-active');
+                        errorEmail.classList.remove('is-active');
+                    }
+                }
+            })
+        })
+    </script>
+</body>
+
+</html>
